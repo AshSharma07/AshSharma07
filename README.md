@@ -14,7 +14,7 @@ Here are some ideas to get you started:
 - 😄 Pronouns: ...
 - ⚡ Fun fact: ...
 -->
-### 🐍 My GitHub Contribution Snake
+
 
 ![github contribution grid snake](https://raw.githubusercontent.com/AshSharma07/AshSharma07/output/github-contribution-grid-snake.svg)
 
