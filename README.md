@@ -17,8 +17,4 @@ Here are some ideas to get you started:
 ### 🐍 My GitHub Contribution Snake
 
 ![github contribution grid snake](https://raw.githubusercontent.com/AshSharma07/AshSharma07/output/github-contribution-grid-snake.svg)
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_USERNAME/output/github-contribution-grid-snake-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_USERNAME/output/github-contribution-grid-snake.svg">
-  <img alt="github contribution grid snake" src="https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_USERNAME/output/github-contribution-grid-snake.svg">
-</picture>
+
