@@ -16,5 +16,5 @@ Here are some ideas to get you started:
 -->
 
 
-![github contribution grid snake](https://raw.githubusercontent.com/AshSharma07/AshSharma07/output/github-contribution-grid-snake.svg)
+
 
