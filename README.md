@@ -4,36 +4,36 @@
 
 ---
 
-🎮 Player: Ash
-🧠 Class: AI/ML Explorer || Coffee-Powered Coder ☕
-📍 Level: B.Tech – Year 3
+🎮 Player: Ash <br>
+🧠 Class: AI/ML Explorer || Coffee-Powered Coder ☕ <br>
+📍 Level: B.Tech – Year 3 <br>
 
-⚔️** Skills Unlocked:**
-• Python, C, HTML, CSS
-• Machine Learning (in progress…)
-• Problem Solving & Debugging
-• Sketching + Creativity Boost
+⚔️ Skills Unlocked: <br>
+• Python, C, HTML, CSS <br>
+• Machine Learning (in progress…) <br>
+• Problem Solving & Debugging <br>
+• Sketching + Creativity Boost <br>
 
-🧠** Brain Specs:**
-• RAM: Depends on sleep
-• CPU: Overheats during exams 🔥
-• Storage: 90% memes, 10% useful knowledge
+🧠 Brain Specs: <br>
+• RAM: Depends on sleep <br>
+• CPU: Overheats during exams🔥 <br>
+• Storage: 90% memes, 10% useful knowledge <br>
 
-🧩 **Current Quests:**
-• Building real-world ML projects
-• Mastering algorithms like a boss
-• Creating something questionable (...maybe)
+🧩 Current Quests: <br>
+• Building real-world ML projects <br>
+• Mastering algorithms like a boss <br>
+• Creating something questionable (...maybe) <br>
 
-🏆** Achievements:**
-✅ Turned curiosity into code
-✅ Survived countless compiler errors
-✅ Broke 10 things while fixing 1
-✅ Still grinding 💪
+🏆 Achievements: <br>
+✅ Turned curiosity into code <br>
+✅ Survived countless compiler errors <br>
+✅ Broke 10 things while fixing 1 <br>
+✅ Still grinding 💪 <br>
 
-💡** Philosophy:**
-if (life == hard) {
-tryAgain();
-}
+💡 Philosophy: <br>
+if (life == hard) { <br>
+  tryAgain(); <br>
+} <br>
 
 ---
 
