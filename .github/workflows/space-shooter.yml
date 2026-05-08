@@ -17,11 +17,11 @@ jobs:
     
     steps:
       - name: generate-contribution-grid-ship.svg
-        uses: Platane/snk/svg-only@v3
+        uses: Platane/snk@v3
         with:
           github_user_name: ${{ github.repository_owner }}
+          # The key change is using the 'outputs' formatting correctly for the spaceship plugin
           outputs: |
-            dist/github-contribution-grid-ship.svg
             dist/github-contribution-grid-ship-dark.svg?color_snake=#00f2ff&color_dots=#121217,#2d1b4d,#4b2e83,#6e44c1,#9b72cf&snake_type=spaceship
         
       - name: push github-contribution-grid-ship.svg to the output branch
