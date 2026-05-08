@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="YOUR_BANNER_IMAGE_URL_HERE" alt="Banner" width="100%" />
+  <img src="game.png" alt="Banner" width="100%" />
 </p>
 
 ---
