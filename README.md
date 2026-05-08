@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="arcade.png" alt="Banner" width="100%" />
+  <img src="levelup.png" alt="Banner" width="100%" />
 </p>
 
 ---
