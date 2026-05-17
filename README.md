@@ -24,7 +24,7 @@
 ---
 ## 🧩 Current Quests:
 • Building real-world ML projects <br>
-• Mastering algorithms like a boss <br>
+• Mastering algorithms <br>
 • Creating something questionable (...maybe) <br>
 
 ---
@@ -37,7 +37,7 @@
 ---
 ## 💡 Philosophy: 
 if (life == hard) { <br>
-<&nbsp><&nbsp>tryAgain(); <br>
+tryAgain(); <br>
 } <br>
 
 ---
