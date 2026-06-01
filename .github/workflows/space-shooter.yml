@@ -31,6 +31,7 @@ jobs:
         run: python .github/scripts/generate_space_shooter.py
         env:
           GITHUB_USERNAME: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
 
       - name: Push SVG to output branch
         uses: crazy-max/ghaction-github-pages@v3.1.0
