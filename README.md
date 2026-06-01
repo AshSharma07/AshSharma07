@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="levelup.png" alt="Banner" width="100%" />
+  <img src="arcade.png" alt="Banner" width="100%" />
 </p>
 
 ---
@@ -19,7 +19,7 @@
 ## 🧠 Brain Specs: 
 • RAM: Depends on sleep <br>
 • CPU: Overheats during exams🔥 <br>
-• Storage: 90% memes, 10% useful knowledge <br>
+• Storage: verge of fullness <br>
 
 ---
 ## 🧩 Current Quests:
@@ -32,7 +32,7 @@
 ✅ Turned curiosity into code <br>
 ✅ Survived countless compiler errors <br>
 ✅ Broke 10 things while fixing 1 <br>
-✅ Still grinding 💪 <br>
+✅ Still working 💪 <br>
 
 ---
 ## 💡 Philosophy: 
