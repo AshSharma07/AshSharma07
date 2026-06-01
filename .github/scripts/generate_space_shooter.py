@@ -1,208 +1,247 @@
-import os
-import random
-import requests
+import os, random, requests
 from datetime import datetime
 
-USERNAME = os.environ.get("GITHUB_USERNAME", "your-username")
+USERNAME    = os.environ.get("GITHUB_USERNAME", "your-username")
 OUTPUT_PATH = "dist/space-shooter-dark.svg"
 os.makedirs("dist", exist_ok=True)
 
+# ── Fetch contributions via GitHub GraphQL (needs GITHUB_TOKEN in workflow) ──
 def fetch_contributions(username):
-    url = f"https://github-contributions-api.jogruber.de/v4/{username}?y=last"
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if token:
+        query = """
+        {
+          user(login: "%s") {
+            contributionsCollection {
+              contributionCalendar {
+                weeks {
+                  contributionDays {
+                    date
+                    contributionCount
+                  }
+                }
+              }
+            }
+          }
+        }
+        """ % username
+        try:
+            r = requests.post(
+                "https://api.github.com/graphql",
+                json={"query": query},
+                headers={"Authorization": f"bearer {token}"},
+                timeout=10
+            )
+            r.raise_for_status()
+            weeks = (r.json()["data"]["user"]["contributionsCollection"]
+                               ["contributionCalendar"]["weeks"])
+            out = []
+            for week in weeks:
+                for day in week["contributionDays"]:
+                    c = day["contributionCount"]
+                    level = 0 if c==0 else 1 if c<=2 else 2 if c<=5 else 3 if c<=9 else 4
+                    out.append({"date": day["date"], "level": level, "count": c})
+            print(f"Fetched {len([x for x in out if x['level']>0])} active days via GraphQL")
+            return out
+        except Exception as e:
+            print(f"GraphQL fetch failed: {e}")
+
+    # Fallback: public contributions API
     try:
-        r = requests.get(url, timeout=10)
+        r = requests.get(
+            f"https://github-contributions-api.jogruber.de/v4/{username}?y=last",
+            timeout=10)
         r.raise_for_status()
-        return r.json().get("contributions", [])
+        data = r.json().get("contributions", [])
+        print(f"Fetched {len([x for x in data if x.get('level',0)>0])} active days via public API")
+        return data
     except Exception as e:
-        print(f"Warning: Could not fetch contributions: {e}")
+        print(f"Public API also failed: {e}")
         return []
 
 contributions = fetch_contributions(USERNAME)
 
-COLS = 53
-ROWS = 7
-CELL = 14
-GAP  = 3
-STEP = CELL + GAP
+# ── Build grid ───────────────────────────────────────────────────────────────
+COLS=53; ROWS=7; CELL=14; GAP=3; STEP=CELL+GAP
+grid = [[0]*COLS for _ in range(ROWS)]
 
-grid = [[0] * COLS for _ in range(ROWS)]
 for entry in contributions:
-    date    = datetime.strptime(entry["date"], "%Y-%m-%d")
-    dow_svg = (date.weekday() + 1) % 7
-    level   = entry.get("level", 0)
-    today   = datetime.today()
-    delta   = (today - date).days
-    if delta < 0 or delta > 53 * 7:
-        continue
-    col = COLS - 1 - (delta // 7)
-    row = dow_svg
-    if 0 <= col < COLS and 0 <= row < ROWS:
-        grid[row][col] = level
+    try:
+        date    = datetime.strptime(entry["date"], "%Y-%m-%d")
+        dow_svg = (date.weekday() + 1) % 7   # Sun=0 … Sat=6
+        level   = entry.get("level", 0)
+        today   = datetime.today()
+        delta   = (today - date).days
+        if delta < 0 or delta > 53*7:
+            continue
+        col = COLS - 1 - (delta // 7)
+        row = dow_svg
+        if 0 <= col < COLS and 0 <= row < ROWS:
+            grid[row][col] = level
+    except:
+        pass
 
-COLORS = {0:"#161b22", 1:"#2d1b4d", 2:"#4b2e83", 3:"#6e44c1", 4:"#9b72cf"}
+total_dots = sum(1 for c in range(COLS) for r in range(ROWS) if grid[r][c]>0)
+print(f"Grid has {total_dots} active dots")
 
-MARGIN_LEFT = 32
-MARGIN_TOP  = 28
-GRID_W = COLS * STEP
-GRID_H = ROWS * STEP
-SVG_W  = MARGIN_LEFT + GRID_W + 60
-SVG_H  = MARGIN_TOP  + GRID_H + 80
+COLORS = {0:"#161b22",1:"#2d1b4d",2:"#4b2e83",3:"#6e44c1",4:"#9b72cf"}
 
-# Ship travels along the BOTTOM of the grid
-SHIP_Y = MARGIN_TOP + GRID_H + 32
+# ── Layout ───────────────────────────────────────────────────────────────────
+ML=32; MT=28
+GRID_W = COLS*STEP; GRID_H = ROWS*STEP
+SVG_W  = ML + GRID_W + 60
+SVG_H  = MT + GRID_H + 80
 
-# The ship's X at time T:  ship_x(T) = SHIP_START_X + (SHIP_END_X - SHIP_START_X) * T / TOTAL_DUR
-# We want the laser to fire when ship_x == col_center_x
-# col_center_x = MARGIN_LEFT + col * STEP + CELL/2
-# So fire_time = (col_center_x - SHIP_START_X) / (SHIP_END_X - SHIP_START_X) * TOTAL_DUR
+# Ship Y = below grid
+SHIP_Y = MT + GRID_H + 30
 
-SHIP_START_X = float(MARGIN_LEFT - 30)
-SHIP_END_X   = float(MARGIN_LEFT + GRID_W + 20)
-SHIP_TRAVEL  = SHIP_END_X - SHIP_START_X
+# Ship travels from left edge to right edge
+SX0 = float(ML - 40)          # start X
+SX1 = float(ML + GRID_W + 30) # end X
+SPAN = SX1 - SX0
 
-# Give a small pause at end before looping so dots can "respawn"
-TRAVEL_DUR = COLS * 0.17   # time ship is actually moving
-PAUSE_DUR  = 1.5           # pause at end before restart
-TOTAL_DUR  = TRAVEL_DUR + PAUSE_DUR
+# Timing: ship takes TRAVEL_DUR to cross, then RESET_DUR pause (dots reset + ship hidden)
+TRAVEL_DUR = COLS * 0.16     # ~8.5 s
+RESET_DUR  = 0.8             # short pause
+TOTAL_DUR  = TRAVEL_DUR + RESET_DUR
 
-parts = []   # collect all SVG elements
+def pct(t):
+    """Clamp t (seconds) to a keyTimes fraction string."""
+    return f"{min(max(t/TOTAL_DUR, 0.0001), 0.9998):.5f}"
 
-# ── Stars ──────────────────────────────────────────────────────────────────
-random.seed(42)
-for _ in range(80):
-    sx    = random.randint(0, SVG_W)
-    sy    = random.randint(0, SVG_H - 40)
-    sr    = random.choice([0.5, 0.8, 1.0])
-    delay = round(random.uniform(0, 2), 2)
+parts = []
+
+# ── Background ───────────────────────────────────────────────────────────────
+random.seed(99)
+for _ in range(90):
+    sx=random.randint(0,SVG_W); sy=random.randint(0,SVG_H-30)
+    sr=random.choice([0.5,0.8,1.0]); delay=round(random.uniform(0,3),2)
     parts.append(
-        f'<circle cx="{sx}" cy="{sy}" r="{sr}" fill="white" opacity="0.4">'
-        f'<animate attributeName="opacity" values="0.4;1;0.4" dur="2s" begin="{delay}s" repeatCount="indefinite"/>'
+        f'<circle cx="{sx}" cy="{sy}" r="{sr}" fill="white" opacity="0.35">'
+        f'<animate attributeName="opacity" values="0.35;0.9;0.35" '
+        f'dur="{round(random.uniform(1.5,3.5),1)}s" begin="{delay}s" repeatCount="indefinite"/>'
         f'</circle>'
     )
 
-# ── Day labels ──────────────────────────────────────────────────────────────
-DOW_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
-for i, label in enumerate(DOW_LABELS):
+# ── Day labels ───────────────────────────────────────────────────────────────
+for i, lbl in enumerate(["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]):
     if i % 2 == 1:
-        ly = MARGIN_TOP + i * STEP + CELL / 2 + 4
+        ly = MT + i*STEP + CELL/2 + 4
         parts.append(
-            f'<text x="{MARGIN_LEFT-6}" y="{ly:.1f}" font-size="9" fill="#8b949e" '
-            f'text-anchor="end" font-family="monospace">{label}</text>'
+            f'<text x="{ML-6}" y="{ly:.1f}" font-size="9" fill="#8b949e" '
+            f'text-anchor="end" font-family="monospace">{lbl}</text>'
         )
 
-# ── Dots + lasers + explosions ──────────────────────────────────────────────
+# ── Dots, lasers, explosions ─────────────────────────────────────────────────
 for col in range(COLS):
-    col_cx = MARGIN_LEFT + col * STEP + CELL / 2   # center x of this column
+    cx = ML + col*STEP + CELL/2   # column center X
 
-    # Exact time the ship nose is at col_cx
-    ship_arrive = (col_cx - SHIP_START_X) / SHIP_TRAVEL * TRAVEL_DUR
+    # Time when ship center is exactly at cx
+    # ship_x(t) = SX0 + SPAN * t/TRAVEL_DUR  →  t = (cx-SX0)/SPAN * TRAVEL_DUR
+    arrive = (cx - SX0) / SPAN * TRAVEL_DUR
 
     for row in range(ROWS):
         level = grid[row][col]
-        rx = MARGIN_LEFT + col * STEP
-        ry = MARGIN_TOP  + row * STEP
-        dot_cy = ry + CELL / 2
-        color  = COLORS[level]
+        rx = ML + col*STEP
+        ry = MT + row*STEP
 
-        # ── dot (always draw, even level-0 as background cell) ──
-        dot_id = f"d{row}_{col}"
+        # Draw dot (all cells including empty for background grid look)
+        did = f"d{row}_{col}"
         parts.append(
-            f'<rect id="{dot_id}" x="{rx}" y="{ry}" width="{CELL}" height="{CELL}" '
-            f'rx="2" fill="{color}"/>'
+            f'<rect id="{did}" x="{rx}" y="{ry}" width="{CELL}" height="{CELL}" '
+            f'rx="2" fill="{COLORS[level]}"/>'
         )
 
         if level == 0:
-            continue   # no laser/explosion for empty cells
+            continue
 
-        # Fire time: ship arrives at column, then tiny per-row stagger so
-        # it looks like one sweep rather than all rows at once
-        fire_t  = ship_arrive + row * 0.018   # seconds into the loop
-        laser_d = 0.10    # laser visible duration (s)
-        fade_d  = 0.12    # dot fade duration (s)
-        exp_d   = 0.18    # explosion duration (s)
+        # Stagger rows by 15ms so lasers don't all fire simultaneously
+        ft = arrive + row * 0.015
 
-        # All keyTimes are fractions of TOTAL_DUR
-        def kt(t): return min(max(t / TOTAL_DUR, 0.0001), 0.9999)
-
-        ft  = kt(fire_t)
-        flt = kt(fire_t + laser_d)
-        fdt = kt(fire_t + fade_d)
-        fet = kt(fire_t + exp_d)
-        # "reset" point — just before loop end, dots pop back
-        rst = 0.9999
-
-        # ── dot fade: visible → shot → gone → reappear at reset ──
+        # Dot: visible → instant vanish at ft → stay gone → reappear just before loop end
         parts.append(
-            f'<animate xlink:href="#{dot_id}" attributeName="opacity" '
+            f'<animate xlink:href="#{did}" attributeName="opacity" '
             f'values="1;1;0;0;1" '
-            f'keyTimes="0;{ft:.4f};{fdt:.4f};{rst};1" '
+            f'keyTimes="0;{pct(ft)};{pct(ft+0.05)};{pct(TOTAL_DUR-0.05)};1" '
             f'dur="{TOTAL_DUR:.3f}s" repeatCount="indefinite" calcMode="linear"/>'
         )
 
-        # ── laser beam ──
+        dot_cy = ry + CELL/2
+
+        # Laser: flash up from ship to dot at exact fire time
+        LD = 0.08   # laser duration
         parts.append(
-            f'<line x1="{col_cx:.1f}" y1="{SHIP_Y}" x2="{col_cx:.1f}" y2="{dot_cy:.1f}" '
+            f'<line x1="{cx:.1f}" y1="{SHIP_Y}" x2="{cx:.1f}" y2="{dot_cy:.1f}" '
             f'stroke="#00f2ff" stroke-width="1.5" opacity="0">'
-            f'<animate attributeName="opacity" values="0;0;1;0;0" '
-            f'keyTimes="0;{ft:.4f};{kt(fire_t+laser_d*0.4):.4f};{flt:.4f};1" '
+            f'<animate attributeName="opacity" '
+            f'values="0;0;1;0;0" '
+            f'keyTimes="0;{pct(ft)};{pct(ft+LD*0.3)};{pct(ft+LD)};1" '
             f'dur="{TOTAL_DUR:.3f}s" repeatCount="indefinite" calcMode="linear"/>'
             f'</line>'
         )
 
-        # ── explosion particles ──
-        for dx, dy, pr in [(-5,-5,2),(5,-5,2),(0,-8,1.5),(-8,0,1.5),(8,0,1.5)]:
-            ex, ey = col_cx + dx, dot_cy + dy
+        # Explosion
+        ED = 0.20
+        for dx,dy,pr in [(-4,-4,2),(4,-4,2),(0,-7,1.5),(-7,0,1.5),(7,0,1.5),(0,4,1)]:
+            ex,ey = cx+dx, dot_cy+dy
             parts.append(
-                f'<circle cx="{ex:.1f}" cy="{ey:.1f}" r="{pr}" fill="#9b72cf" opacity="0">'
+                f'<circle cx="{ex:.1f}" cy="{ey:.1f}" r="{pr}" fill="#c084fc" opacity="0">'
                 f'<animate attributeName="opacity" values="0;0;1;0;0" '
-                f'keyTimes="0;{ft:.4f};{kt(fire_t+exp_d*0.4):.4f};{fet:.4f};1" '
+                f'keyTimes="0;{pct(ft)};{pct(ft+ED*0.3)};{pct(ft+ED)};1" '
                 f'dur="{TOTAL_DUR:.3f}s" repeatCount="indefinite" calcMode="linear"/>'
-                f'<animate attributeName="r" values="{pr};{pr};{pr*2.5:.1f};0;{pr}" '
-                f'keyTimes="0;{ft:.4f};{kt(fire_t+exp_d*0.5):.4f};{fet:.4f};1" '
+                f'<animate attributeName="r" values="{pr};{pr};{pr*3:.1f};0;{pr}" '
+                f'keyTimes="0;{pct(ft)};{pct(ft+ED*0.5)};{pct(ft+ED)};1" '
                 f'dur="{TOTAL_DUR:.3f}s" repeatCount="indefinite" calcMode="linear"/>'
                 f'</circle>'
             )
 
-# ── Ship ────────────────────────────────────────────────────────────────────
-# Ship moves only during TRAVEL_DUR, then snaps back (we hide it during pause)
-# We use two animations: translateX and opacity
-travel_frac = TRAVEL_DUR / TOTAL_DUR
+# ── Ship ─────────────────────────────────────────────────────────────────────
+# Key fix: ship is a single <g> at y=SHIP_Y with ONE animateTransform (additive=sum)
+# that animates only the X translation. No nested transforms.
+tf = TRAVEL_DUR / TOTAL_DUR  # fraction when travel ends
 
 parts.append(f'''
-<g transform="translate(0 {SHIP_Y})">
-  <g>
-    <!-- Move ship across during travel phase, snap back at loop end -->
-    <animateTransform attributeName="transform" type="translate"
-      values="{SHIP_START_X} 0;{SHIP_END_X} 0;{SHIP_START_X} 0"
-      keyTimes="0;{travel_frac:.4f};1"
-      dur="{TOTAL_DUR:.3f}s" repeatCount="indefinite" calcMode="linear"/>
-    <!-- Hide ship during snap-back pause -->
-    <animate attributeName="opacity"
-      values="1;1;0;0;1"
-      keyTimes="0;{travel_frac:.4f};{travel_frac+0.001:.4f};0.9999;1"
-      dur="{TOTAL_DUR:.3f}s" repeatCount="indefinite" calcMode="discrete"/>
+<g id="ship-group">
+  <!-- X motion across grid, then snap back hidden -->
+  <animateTransform attributeName="transform" type="translate"
+    values="{SX0:.1f},{SHIP_Y};{SX1:.1f},{SHIP_Y};{SX0:.1f},{SHIP_Y}"
+    keyTimes="0;{tf:.5f};1"
+    dur="{TOTAL_DUR:.3f}s"
+    repeatCount="indefinite"
+    calcMode="linear"/>
+  <!-- Hide during snap-back -->
+  <animate attributeName="opacity"
+    values="1;1;0;0;1"
+    keyTimes="0;{tf:.5f};{tf+0.0001:.5f};0.9999;1"
+    dur="{TOTAL_DUR:.3f}s"
+    repeatCount="indefinite"
+    calcMode="discrete"/>
 
-    <!-- Body -->
-    <rect x="-6" y="-10" width="12" height="16" rx="2" fill="#00f2ff"/>
-    <!-- Cockpit -->
-    <rect x="-3" y="-14" width="6" height="7" rx="2" fill="#ffffff" opacity="0.85"/>
-    <!-- Left wing -->
-    <polygon points="-6,-2 -16,6 -6,6" fill="#6e44c1"/>
-    <!-- Right wing -->
-    <polygon points="6,-2 16,6 6,6" fill="#6e44c1"/>
-    <!-- Engine glow -->
-    <ellipse cx="0" cy="7" rx="4" ry="3" fill="#ff6600" opacity="0.9">
-      <animate attributeName="ry" values="3;5;3" dur="0.2s" repeatCount="indefinite"/>
-      <animate attributeName="opacity" values="0.9;0.6;0.9" dur="0.2s" repeatCount="indefinite"/>
-    </ellipse>
-    <ellipse cx="0" cy="10" rx="2" ry="4" fill="#ffaa00" opacity="0.7">
-      <animate attributeName="ry" values="4;6;4" dur="0.15s" repeatCount="indefinite"/>
-    </ellipse>
-  </g>
+  <!-- Body -->
+  <rect x="-6" y="-10" width="12" height="16" rx="2" fill="#00f2ff"/>
+  <!-- Cockpit -->
+  <rect x="-3" y="-14" width="6" height="7" rx="2" fill="#e0f7ff" opacity="0.9"/>
+  <!-- Wings -->
+  <polygon points="-6,-2 -18,8 -6,8" fill="#7c3aed"/>
+  <polygon points="6,-2 18,8 6,8" fill="#7c3aed"/>
+  <!-- Wing accent -->
+  <polygon points="-6,2 -14,8 -6,8" fill="#a855f7" opacity="0.6"/>
+  <polygon points="6,2 14,8 6,8" fill="#a855f7" opacity="0.6"/>
+  <!-- Engine -->
+  <ellipse cx="0" cy="8" rx="4" ry="3" fill="#f97316">
+    <animate attributeName="ry" values="3;6;3" dur="0.18s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0.6;1" dur="0.18s" repeatCount="indefinite"/>
+  </ellipse>
+  <ellipse cx="0" cy="12" rx="2" ry="5" fill="#fbbf24" opacity="0.7">
+    <animate attributeName="ry" values="5;8;5" dur="0.13s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.7;0.3;0.7" dur="0.13s" repeatCount="indefinite"/>
+  </ellipse>
+  <!-- Gun tip (where laser fires from) -->
+  <rect x="-1" y="-16" width="2" height="4" rx="1" fill="#00f2ff"/>
 </g>
 ''')
 
-# ── Assemble ─────────────────────────────────────────────────────────────────
+# ── Write SVG ────────────────────────────────────────────────────────────────
 svg = f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
   width="{SVG_W}" height="{SVG_H}" viewBox="0 0 {SVG_W} {SVG_H}">
   <rect width="{SVG_W}" height="{SVG_H}" fill="#0d1117" rx="8"/>
@@ -212,4 +251,4 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org
 with open(OUTPUT_PATH, "w") as f:
     f.write(svg)
 
-print(f"Generated {OUTPUT_PATH}  {SVG_W}x{SVG_H}px  loop={TOTAL_DUR:.2f}s  (travel={TRAVEL_DUR:.2f}s + pause={PAUSE_DUR:.2f}s)")
+print(f"Done → {OUTPUT_PATH}  {SVG_W}×{SVG_H}  loop={TOTAL_DUR:.2f}s")
