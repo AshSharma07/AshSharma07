@@ -41,7 +41,3 @@ tryAgain(); <br>
 } <br>
 
 ---
-## 🚀 GitHub Activity
-<p align="center">
-  <img src="https://raw.githubusercontent.com/AshSharma07/AshSharma07/output/space-shooter-dark.svg" alt="Space Shooter" width="100%" />
-</p>
